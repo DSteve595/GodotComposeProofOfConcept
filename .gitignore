@@ -1,0 +1,11 @@
+.DS_Store
+
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+.idea/
+.gradle/
+/build/
+/gdj/
+/jvm/
