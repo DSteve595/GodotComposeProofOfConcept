@@ -3,15 +3,34 @@ package godot
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.ObserverHandle
 import androidx.compose.runtime.snapshots.Snapshot
+import godot.annotation.RegisterClass
+import godot.annotation.RegisterFunction
+import godot.api.Control
 import godot.api.Node
 import godot.api.Time
 import godot.core.connect
-import godot.coroutines.GodotDispatchers
 import godot.coroutines.await
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
+import kotlin.coroutines.CoroutineContext
 import kotlin.time.Duration.Companion.microseconds
 
-fun startNodeInTreeComposition(node: Node, content: @Composable () -> Unit) {
+@RegisterClass
+abstract class ComposeNode : Control() {
+
+  internal val processChannel = Channel<() -> Unit>(capacity = Channel.UNLIMITED)
+
+  @RegisterFunction
+  override fun _process(delta: Double) {
+    var process = processChannel.tryReceive()
+    while (process.isSuccess) {
+      process.getOrThrow().invoke()
+      process = processChannel.tryReceive()
+    }
+  }
+}
+
+fun startNodeInTreeComposition(node: ComposeNode, content: @Composable () -> Unit) {
   require(node.isInsideTree()) { "Node must be inside the tree to create a composition" }
   val scope = createNodeCoroutineScope(node)
   val recomposer = Recomposer(scope.coroutineContext)
@@ -42,14 +61,19 @@ fun startNodeInTreeComposition(node: Node, content: @Composable () -> Unit) {
   }
 }
 
-private fun createNodeCoroutineScope(node: Node): CoroutineScope {
+private fun createNodeCoroutineScope(node: ComposeNode): CoroutineScope {
+  val nodeProcessDispatcher = object : CoroutineDispatcher() {
+    override fun dispatch(context: CoroutineContext, block: Runnable) {
+      node.processChannel.trySend { block.run() }
+    }
+  }
   val frameClock = object : MonotonicFrameClock {
     override suspend fun <R> withFrameNanos(onFrame: (frameTimeNanos: Long) -> R): R {
       node.getTree()!!.processFrame.await()
       return onFrame(Time.getTicksUsec().microseconds.inWholeNanoseconds)
     }
   }
-  val scope = CoroutineScope(SupervisorJob() + GodotDispatchers.ProcessFrame + frameClock)
+  val scope = CoroutineScope(SupervisorJob() + nodeProcessDispatcher + frameClock)
   node.treeExiting.connect { scope.cancel() }
   return scope
 }
