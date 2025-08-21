@@ -9,19 +9,21 @@ import godot.api.Control
 import godot.api.Node
 import godot.api.Time
 import godot.core.connect
-import godot.coroutines.await
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.suspendCoroutine
 import kotlin.time.Duration.Companion.microseconds
 
 @RegisterClass
 abstract class ComposeNode : Control() {
 
+  internal val processStartChannel = Channel<Unit>()
   internal val processChannel = Channel<() -> Unit>(capacity = Channel.UNLIMITED)
 
   @RegisterFunction
   override fun _process(delta: Double) {
+    processStartChannel.trySend(Unit)
     var process = processChannel.tryReceive()
     while (process.isSuccess) {
       process.getOrThrow().invoke()
@@ -69,8 +71,10 @@ private fun createNodeCoroutineScope(node: ComposeNode): CoroutineScope {
   }
   val frameClock = object : MonotonicFrameClock {
     override suspend fun <R> withFrameNanos(onFrame: (frameTimeNanos: Long) -> R): R {
-      node.getTree()!!.processFrame.await()
-      return onFrame(Time.getTicksUsec().microseconds.inWholeNanoseconds)
+      node.processStartChannel.receive()
+      return suspendCoroutine { continuation ->
+        continuation.resumeWith(runCatching { onFrame(Time.getTicksUsec().microseconds.inWholeNanoseconds) })
+      }
     }
   }
   val scope = CoroutineScope(SupervisorJob() + nodeProcessDispatcher + frameClock)
