@@ -1,3 +1,5 @@
+import org.jetbrains.compose.ComposeBuildConfig
+
 plugins {
   id("com.utopia-rise.godot-kotlin-jvm") version "0.13.1-4.4.1"
   id("org.jetbrains.compose") version "1.8.2"
@@ -24,5 +26,6 @@ godot {
 
 dependencies {
   implementation(compose.runtime)
-  compileOnly(compose.ui)
+  implementation("org.jetbrains.compose.animation:animation-core:${ComposeBuildConfig.composeVersion}")
+//  compileOnly(compose.ui)
 }
