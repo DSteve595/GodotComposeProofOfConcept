@@ -14,14 +14,8 @@ import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSType
-import com.squareup.kotlinpoet.ClassName
-import com.squareup.kotlinpoet.FileSpec
-import com.squareup.kotlinpoet.FunSpec
-import com.squareup.kotlinpoet.KModifier
+import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
-import com.squareup.kotlinpoet.PropertySpec
-import com.squareup.kotlinpoet.TypeSpec
-import com.squareup.kotlinpoet.TypeVariableName
 import com.squareup.kotlinpoet.ksp.toTypeName
 
 class ComposableGeneratorProcessor(
@@ -251,26 +245,53 @@ class ComposableGeneratorProcessor(
           )
         }
       }
+      .apply {
+        if (!isBaseControl && controlDeclaration.primaryConstructor?.isPublic() == true) {
+          addFunction(
+            FunSpec.builder(controlDeclaration.simpleName.asString())
+              .addAnnotation(ClassName("androidx.compose.runtime", "Composable"))
+              .addParameter(
+                ParameterSpec.builder(
+                  "props",
+                  LambdaTypeName.get(
+                    receiver = ClassName(packageName, "${controlDeclaration.simpleName.asString()}Props"),
+                    returnType = UNIT
+                  )
+                )
+                  .defaultValue("{ }")
+                  .build()
+              )
+              .addParameter(
+                ParameterSpec.builder(
+                  "content",
+                  LambdaTypeName.get(returnType = UNIT).copy(
+                    annotations = listOf(
+                      AnnotationSpec.builder(
+                        ClassName("androidx.compose.runtime", "Composable")
+                      ).build()
+                    )
+                  )
+                )
+                  .build()
+              )
+              .addCode(
+                """
+              godot.ControlNode(
+                factory = { %L() },
+                propsImpl = androidx.compose.runtime.remember { %L() },
+                propsBlock = props,
+                content = content,
+              )
+            """.trimIndent(),
+                ClassName(packageName, controlDeclaration.simpleName.asString()),
+                ClassName(packageName, "${controlDeclaration.simpleName.asString()}PropsImpl"),
+              )
+              .build()
+          )
+        }
+      }
       .build()
   }
 
   private fun KSPropertyDeclaration.isSignal(): Boolean = signalType.isAssignableFrom(type.resolve())
-
-  /*
-  internal class LabelPropsImpl : LabelProps, ControlPropsImpl<Label> {
-
-    override var position: Vector2 = Vector2.ZERO
-    override var text: String = ""
-
-    override fun Updater<Label>.updateNodeProperties() {
-      set(position) { this.setPosition(it) }
-      set(text) { this.text = it }
-    }
-
-    override fun clear() {
-      position = Vector2.ZERO
-      text = ""
-    }
-  }
-   */
 }

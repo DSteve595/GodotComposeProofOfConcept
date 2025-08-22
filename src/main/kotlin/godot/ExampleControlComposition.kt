@@ -4,6 +4,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.runtime.*
 import godot.annotation.RegisterClass
 import godot.annotation.RegisterFunction
+import godot.api.HBoxContainer
+import godot.api.VBoxContainer
 import godot.core.Color
 import godot.core.Vector2
 import godot.global.GD
