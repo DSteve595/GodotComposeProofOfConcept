@@ -4,6 +4,7 @@
 .godot/
 /android/
 
+.kotlin/
 .idea/
 .gradle/
 /build/
