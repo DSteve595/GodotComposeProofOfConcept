@@ -5,3 +5,4 @@ plugins {
 }
 
 rootProject.name = "ComposeNodeExample"
+include(":composable-generator")

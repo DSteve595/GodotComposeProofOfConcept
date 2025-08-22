@@ -4,6 +4,7 @@ plugins {
   id("com.utopia-rise.godot-kotlin-jvm") version "0.13.1-4.4.1"
   id("org.jetbrains.compose") version "1.8.2"
   id("org.jetbrains.kotlin.plugin.compose") version "2.1.10" // kotlin version
+  id("com.google.devtools.ksp") version "2.1.10-1.0.31"
 }
 
 repositories {
@@ -27,5 +28,6 @@ godot {
 dependencies {
   implementation(compose.runtime)
   implementation("org.jetbrains.compose.animation:animation-core:${ComposeBuildConfig.composeVersion}")
+  ksp(project(":composable-generator"))
 //  compileOnly(compose.ui)
 }
